@@ -1,7 +1,7 @@
 # pyDemonlistAPI
 An python library that simply provides Global List API to your code
 
-Developed by Karelskiy127 and [AdderTeam](t.me/adderteam)
+Developed by Karelskiy127 and [AdderTeam](https://t.me/adderteam)
 
 ## Requirements
 You need requests, countryflag and logging libraries for correct lib work
