@@ -12,7 +12,7 @@ And, of course you need good internet connection
 ### Player class
 You can get any information about player in global by using this class:
 ```
-from globalList import Player
+from demonlist import Player
 ```
 You can contact a specific user by their Global List nickname or by their id
 ```
@@ -38,7 +38,7 @@ All level types:
 ### Country class
 With this class you also can get some values, but for start you need to import it:
 ```
-from globalList import Country
+from demonlist import Country
 ```
 And now you can get any information about country
 ```
@@ -61,7 +61,7 @@ display_mode is a setting that displays what you will receive.
 ### Level class
 You can get any level information using this class:
 ```
-from globalList import Level
+from demonlist import Level
 level = Level('Acheron') # ONLY string value
 ```
 Values that you can get:
@@ -99,7 +99,7 @@ print(level.history()) # Returns default string
 ### Top functions (players and future/classics lists)
 You can get top of players and levels lists by using this:
 ```
-from globalList import level_list, players_ranking
+from demonlist import level_list, players_ranking
 ```
 Let's start with level_list:
 ```
