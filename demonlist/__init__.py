@@ -146,8 +146,11 @@ class Player:
                 "offset": 0,
                 "username_search": user
             }
-            user = _connector(url, params)[0]['id']
-            self._data = self._get_by_id(user)
+            try:
+                user = _connector(url, params)[0]['id']
+                self._data = self._get_by_id(user)
+            except IndexError:
+                raise ValueError(f"Player '{user}' not found.")
         else:
             raise ValueError("You must enter an integer or string to Player class.")
         data = self._data
@@ -156,7 +159,7 @@ class Player:
         self.score = data['score']
         self.username = data['username']
         self.country = data['country']
-        self.flag = getflag(self.country)
+        self.flag = getflag(self.country) if self.country != 'Unknown' else ''
         self.badge = data['badge']
         self.hardest = [data['hardest']['level_name'],
                         data['hardest']['level_id'],
@@ -199,7 +202,10 @@ class Country:
         global api_url
         url = f'{api_url}/countries/top/main'
         self._name = name.replace(' ', '-')
-        self.flag = getflag(self._name)
+
+        if self._name == 'Unknown': self.flag = ''
+        else: self.flag = getflag(self._name)
+
         self._data = _connector(url)
         for country in self._data:
             if country["country"] == self._name:
