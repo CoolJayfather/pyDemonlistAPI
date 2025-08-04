@@ -14,7 +14,7 @@ if not logger.handlers:
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.ERROR)
     formatter = logging.Formatter(
-        '%(name)s - %(levelname)s\n%(message)s',
+        '%(asctime)s - %(name)s - %(levelname)s\n%(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     handler.setFormatter(formatter)
