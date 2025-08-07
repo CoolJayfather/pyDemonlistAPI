@@ -16,11 +16,11 @@ from demonlist import Player
 ```
 You can contact a specific user by their Global List nickname or by their id
 ```
-player = Player('w3rty') # By nickname (only string)
-player = Player(3641) # By id (only integer)
+player = Player('w3rty') # By nickname (string)
+player = Player(3641) # By id (integer)
 ```
 Values that you can get:
-> id, place, score, country, username, hardest, badge, flag
+> id, place, score, country, username, hardest, badge, flag, records
 
 For example:
 ```
@@ -30,10 +30,10 @@ For 'w3rty' it returns 16
 
 Also, you can get all records of player, or records in specific category, use this:
 ```
-print(player.records(levelType='basic') # levelType here is records category, if you want get ALL records do not write this value
+print(player.records(records_type='basic') # levelType here is records category, if you want get ALL records do not write this value
 ```
 All level types:
-> 'main', 'basic', 'extended', 'beyond', 'verified', 'progress'
+> 'all', 'main', 'basic', 'extended', 'beyond', 'verified', 'progress'
 
 ### Country class
 With this class you also can get some values, but for start you need to import it:
@@ -54,7 +54,7 @@ country.players(display_mode='default')
 ```
 display_mode is a setting that displays what you will receive.
 
-'default' (or just ()) returns an string with all players
+'default' returns an string with all players
 
 'list' returns a list object with all players and infomation about them
 
@@ -62,10 +62,13 @@ display_mode is a setting that displays what you will receive.
 You can get any level information using this class:
 ```
 from demonlist import Level
-level = Level('Acheron') # ONLY string value
+level = Level('Acheron') # ONLY level name
 ```
-Values that you can get:
-> place, video, verifier, score, list_percent, creator, id
+Values that you can get...
+For classic list level:
+> id, place, score, song, video, creator, holder, verifier, list_percent, length, history
+For future list level:
+> status, record, category, video, verifier
 
 For example
 ```
@@ -77,7 +80,7 @@ Also, you can get all records on specific level, by using this:
 ```
 print(level.records(amount=True)) # For the total count of all records
 print(level.records()) # For the string of 50 records
-print(level.records(display_mode='list)) # For list-object of 50 records
+print(level.records(display_mode='list')) # For list-object of 50 records
 ```
 **Warning**: Global List limits do not allow to display all records at once, therefore to display something from a certain offset there is an offset value
 
@@ -107,7 +110,7 @@ print(level_list(display_mode='list', offset=50)) # Returns a list obj of 51-100
 # If you want string do not write display_mode value, if you want 50 levels from the beginning of the top do not write offset.
 # You can change offset how you want (for example: offset=100 returns 101-150 levels)
 print(level_list(as_names=True)) # Returns list obj with levels names. You can only specify offset along with this value.
-print(level_list(type='future')) # Returns future list as a string. If you want list object, add display_mode='list'. THIS PARAMETER DO NOT SUPPORT OFFSET/AS_NAMES!!!
+print(level_list(list_type='future')) # Returns future list as a string. If you want list object, add display_mode='list'. THIS PARAMETER DO NOT SUPPORT OFFSET/AS_NAMES!!!
 ```
 And now, players_ranking:
 ```
@@ -116,4 +119,4 @@ print(players_ranking(display_mode='list', offset=50)) # Returns a list obj with
 ```
 
 ## That's all!
-At the moment these are all the functions present in the library. The library is still raw, but you can already use it. About bugs, write to me in telegram: @karelskiy127, or discord: karjalan
+At the moment these are all the functions present in the library. The library is still raw, but you can already use it. About bugs, write to us in telegram: @karelskiy127 / @xboctatuk6, or discord: karjalan / lisenok1042

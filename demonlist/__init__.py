@@ -1,12 +1,18 @@
 import sys
-
-import countryflag
-import requests
 import logging
+import requests
 from countryflag import getflag
-from urllib3.exceptions import HTTPError
+from typing import Literal, get_args
 
-api_url = 'https://api.demonlist.org'
+API_URL = 'https://api.demonlist.org'
+
+class StateError: pass
+
+DisplayMode = Literal['default', 'list']
+ListType = Literal['classic', 'future']
+RecordsType = Literal['all', 'main', 'basic', 'extended', 'beyond', 'verified', 'progress']
+CountriesType = Literal['main', 'advanced']
+OrderBy = Literal['newest', 'oldest', 'place']
 
 logger = logging.getLogger('Demonlist API')
 logger.setLevel(logging.ERROR)
@@ -20,139 +26,173 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-# im too lazy to comment all of this go watch project-doc
+def _connector(url, params = None):
+    response = requests.get(url, params)
+    response.raise_for_status()
 
-def _connector(url, params=None):
-    response = requests.get(url, params=params)
-    if response.status_code == 200:
-        return response.json()["data"]
-    else:
-        raise HTTPError(f'{url} gave the wrong answer: {response.status_code}. Check your internet-connection, or disable VPN/proxy')
+    return response.json()['data']
 
+def players_ranking(offset = 0, limit = 0, country = 'any', display_mode: DisplayMode = 'default'):
+    """Retrieves a slice of the top players leaderboard.
 
-def players_ranking(offset=0, display_mode=None):
+        :param offset: The starting index for the player list.
+        :type offset: int
+        :param limit: The maximum number of players to return.
+        :type limit: int
+        :param country: A country code to filter the leaderboard.
+        :type country: str
+        :param display_mode: Defines the output format. Use 'list' to get a list
+        of player objects, or 'default' for a formatted string.
+        :type display_mode: str
+        :return: A list of players or a formatted string, depending on the display_mode.
+        :rtype: list | str
     """
-    RU: Возвращает топ игроков начиная от offset. Если offset не задан топ начинается с начала.
-    Пример: offset = 300. Топ: 301-351 | offset - переменная и ни что иное
-    display_mode позволяет настроить вывод топа игроков. list = лист-объект, default/None выводит позицию игрока его страну, ник и очки
-    EN: Returns the top players starting from offset. If offset is not specified, the top starts from the beginning.
-    Example: offset = 300. Top: 301-350 | offset must be an integer
-    display_mode allows you to customize the display of the top players. list = list object, default/None displays the player's position, country, nickname and points
-    """
-    global api_url
-    url = f"{api_url}/users/top"
-    params = {
-        "limit": 50,
-        "offset": offset
-    }
     try:
+        if not isinstance(offset, int): raise TypeError('"offset" value must be an integer')
+        if not isinstance(limit, int): raise TypeError('"limit" value must be an integer')
+        if not isinstance(country, str): raise TypeError('"country" value must be an string')
+        if display_mode not in get_args(DisplayMode): raise ValueError('"display_mode" must be "default" or "list"')
+        if limit > 50:
+            limit = 50
+            logger.warning('Player ranking: The "limit" parameter exceeds the maximum of 50 and has been capped at 50.')
+        country = country.replace(' ', '-')
+
+        url = f'{API_URL}/users/top'
+        params = { "limit": limit, "offset": offset }
+        if country != 'any': params |= { "country": country }
+
         data = _connector(url, params)
-        top = ""
-        if display_mode == None or display_mode == 'default':
+        logger.info('Player ranking: Receiving data successfully.')
+
+        if display_mode == 'default':
+            top = 'Player rankings:\n'
             for player in data:
                 place = player['place']
                 name = player['username']
                 score = player['score']
                 flag = getflag(player['country']) if player['country'] != 'Unknown' else ''
+
                 top += f'{place}. {flag}{name} | Score: {score}\n'
+            
+            return top
         elif display_mode == 'list':
             top = []
             for player in data:
-                new_pl = {
+                new_player = {
                     "place": player['place'],
                     "name": player['username'],
                     "score": player['score'],
-                    "flag": getflag(player['country']) if player['country'] != 'Unknown' else ''
-                }
-                top.append(new_pl)
-        else:
-            raise ValueError('Unknown display_mode type\n Use "default" or "list"')
-        return top
-    except HTTPError as e:
-        logger.error(e)
-    except Exception as e:
-        logger.error(e)
+                    "flag": getflag(player['country']) if player['country'] != 'Unknown' else '' }
+                top.append(new_player)
 
-def level_list(offset=0, display_mode=None, type='classic', as_names=False):
-    """
-    RU: Вернет топ демонов (/levels/classic) по нужному оффсету, например если оффсет 50 то будут уровни от 51 до 100
-    EN: Returns demonlist (/levels/classic) by the required offset, for example, if the offset is 50, then there will be levels from 51 to 100
-    """
-    if not isinstance(offset, int):
-        raise TypeError("'offset' value must be an integer")
-    if not display_mode == None and not isinstance(display_mode, str):
-        raise TypeError("'display_mode' must be a string")
-    if as_names == True and not display_mode == None:
-        raise TypeError("'display_mode' cannot have a value when as_names=True")
-
-    global api_url
-    url = None
-    params = None
-    if type == 'future':
-        top = _get_futurelist(display_mode)
-        return top
-    elif type == 'classic':
-        url = f"{api_url}/levels/classic"
-        params = {
-            "limit": 50,
-            "offset": offset
-        }
-    else:
-        raise ValueError('Unknown demonlist type.\n Use "classic" or "future"')
-    try:
-        data = _connector(url, params)
-        top = None
-        if as_names == True:
-            top = []
-            for level in data:
-                top.append(level['name'])
             return top
-        if display_mode == 'list':
-            top = []
-            for level in data:
-                new_level = {
-                    'id': level['level_id'],
-                    'name': level['name'],
-                    'pos': level['place'],
-                    'verifier': level['verifier'],
-                    'video': level['video'],
-                    'creator': level['creator'],
-                    'list_percent': level['minimal_percent'],
-                    'score': level['score']
-                }
-                top.append(new_level)
-        elif display_mode == 'default' or display_mode == None:
-            top = ""
-            for level in data:
-                new_level = f"{level['place']}. {level['name']} verified by {level['verifier']}\n"
-                top += new_level
-        else:
-            raise ValueError('Unknown display_mode type. Use "default" or "list"')
-        return top
     except Exception as e:
-        logger.error(e)
+        logger.error(f'{type(e).__name__}: {e}')
 
+def level_list(offset = 0, limit = 0, list_type: ListType = 'classic', as_names = False, display_mode: DisplayMode = 'default'):
+    """Retrieves a slice of the level leaderboard.
+
+        :param offset: The starting offset for the leaderboard slice.
+        :type offset: int
+        :param limit: The maximum number of levels to retrieve.
+        :type limit: int
+        :param list_type: The type of leaderboard to query ('classic' or 'future').
+        :type list_type: str
+        :param as_names: If True, returns only the names of the levels.
+        :type as_names: bool
+        :param display_mode: Defines the output format. Use 'list' to get a list of levels objects, or 'default' for a formatted string. This parameter is ignored if 'as_names' is True.
+        :type display_mode: str
+        :return: A list of level data or a formatted string, depending on the 'display_mode' and 'as_names' flags.
+        :rtype: list | str
+    """
+    try:
+        if not isinstance(offset, int): raise TypeError('"offset" value must be an integer')
+        if not isinstance(limit, int): raise TypeError('"limit" value must be an integer')
+        if display_mode not in get_args(DisplayMode): raise ValueError('"display_mode" must be "default" or "list"')
+        if not isinstance(list_type, str): raise TypeError('"list_type" value must be an string')
+        if not isinstance(as_names, bool): raise TypeError('"as_names" value must be an boolean')
+
+        params = { "limit": limit, "offset": offset }
+        if list_type in get_args(ListType):
+            url = f'{API_URL}/levels/{list_type}'
+        else:
+            raise ValueError('Unknown list type.\n Use "classic" or "future"')
+        
+        data = _connector(url, params)
+        logger.info('Level list: Receiving data successfully.')
+
+        if as_names:
+            top = []
+            for level in data: top.append(level['name'])
+            return top
+        elif list_type == 'classic':
+            if display_mode == 'list':
+                top = []
+                for level in data:
+                    new_level = {
+                        "id": level['level_id'],
+                        "name": level['name'],
+                        "pos": level['place'],
+                        "verifier": level['verifier'],
+                        "video": level['video'],
+                        "creator": level['creator'],
+                        "list_percent": level['minimal_percent'],
+                        "score": level['score']
+                    }
+                    top.append(new_level)
+                
+                return top
+            elif display_mode == 'default':
+                top = ''
+                for level in data:
+                    new_level = f"{level['place']}. {level['name']} verified by {level['verifier']}\n"
+                    top += new_level
+                
+                return top
+            else:
+                raise ValueError('Unknown display_mode type. Use "default" or "list"')
+        elif list_type == 'future':
+            if display_mode == 'list':
+                top = []
+                for level in data:
+                    new_lvl = {
+                        "name": level['name'],
+                        "verifier": level['verifier'],
+                        "record": f'{level['record']}%',
+                        "status": _status(level['status'])
+                    }
+                    top.append(new_lvl)
+                
+                return top
+            elif display_mode == 'default' or display_mode == None:
+                top = ''
+                for level in data:
+                    top += f'{level['name']} | Status: {_status(level['status'])}\n'
+                
+                return top
+    except Exception as e:
+        logger.error(f'{type(e).__name__}: {e}')
 
 class Player:
-    def __init__(self, user):
-        url = None
-        params = None
-        if isinstance(user, int):
-            self._data = self._get_by_id(user)
+    def __init__(self, user: str):
+        if isinstance(user, int): self._data = self._get_by_id(user)
         elif isinstance(user, str):
             url = "https://api.demonlist.org/users/top"
-            params = {
-                "limit": 1,
-                "offset": 0,
-                "username_search": user
-            }
+            params = { "limit": 1, "offset": 0, "username_search": user }
+
             try:
-                user = _connector(url, params)[0]['id']
-                self._data = self._get_by_id(user)
+                user_id = _connector(url, params)[0]['id']
+                self._data = self._get_by_id(user_id)
+            except requests.exceptions.RequestException as e:
+                logger.error(f'API request failed: {e}')
+                raise ConnectionError(f'Failed to connect to Demonlist API for user {user}') from e
             except IndexError:
-                raise ValueError(f"Player '{user}' not found.")
+                logger.error(f'Player "{user}" not found.')
+                raise ValueError(f'Player not found: {user}')
         else:
-            raise ValueError("You must enter an integer or string to Player class.")
+            raise TypeError('"user" must be integer or string.')
+        logger.info('Player: Receiving data successfully.')
+        
         data = self._data
         self.id = data['id']
         self.place = data['place']
@@ -166,208 +206,236 @@ class Player:
                         data['hardest']['place'],
                         data['hardest']['video']]
 
-    def _get_by_id(self, user):
+    def _get_by_id(self, user_id: int):
         url = "https://api.demonlist.org/users"
-        params = {
-            "id": user
-        }
-        data = _connector(url, params)
-        return data
+        params = { "id": user_id }
 
-    def records(self, levelType='all', limit=-1):
+        try:
+            data = _connector(url, params)
+            return data
+        except Exception as e:
+            logger.error(f'{type(e).__name__}: {e}')
+    
+    def records(self, offset = 0, limit = 0, records_type: RecordsType = 'all', display_mode: DisplayMode = 'default'):
+        """Retrieves a slice of the levels completions.
+
+        :param offset: The starting offset for the records slice.
+        :type offset: int
+        :param limit: The maximum number of records to retrieve.
+        :type limit: int
+        :param records_type: The type of records to query ('all', 'main', 'basic', 'extended', 'beyond', 'verified' or 'progress').
+        :type records_type: str
+        :param display_mode: Defines the output format. Use 'list' to get a list of records, or 'default' for a formatted string. This parameter is ignored if 'as_names' is True.
+        :type display_mode: str
+        :return: A list of records data or a formatted string, depending on the 'display_mode' flag.
+        :rtype: list | str
+    """
+        if not isinstance(offset, int): raise TypeError('"offset" value must be an integer')
+        if not isinstance(limit, int): raise TypeError('"limit" value must be an integer')
+        if records_type not in get_args(RecordsType): raise ValueError('"records_type" must be "all", "main", "basic", "extended", "beyond", "verified" or "progress"')
+        if display_mode not in get_args(DisplayMode): raise ValueError('"display_mode" must be "default" or "list"')
+        if limit == 0: limit = -1
+
         records = self._data['records']
-        if levelType in ['main', 'basic', 'extended', 'beyond', 'verified', 'progress']:
-            levels = records[levelType]
-        elif levelType == 'all':
+
+        if records_type in ['main', 'basic', 'extended', 'beyond', 'verified', 'progress']:
+            levels = records[records_type]
+        elif records_type == 'all':
             levels = records['main'] + records['basic'] + records['extended'] + records['beyond']
-        else:
-            raise ValueError(
-                "Invalid 'levelType' value.\nUse 'main', 'basic', 'extended', 'beyond', 'verified', 'progress' or 'all' values")
+        
+        if display_mode == 'list':
+            records_list = []
+            for level in levels[offset:limit]:
+                record = {
+                    "name": level['level_name'],
+                    "id": level['level_id'],
+                    "place": level['place'],
+                    "video": level['video']
+                }
+                if records_type == 'progress':
+                    record['percent'] = level['percent']
+                records_list.append(record)
 
-        recordsList = []
-        for level in levels[:limit]:
-            record = {
-                "name": level['level_name'],
-                "id": level['level_id'],
-                "place": level['place'],
-                "video": level['video']
-            }
-            recordsList.append(record)
-            if levelType == 'progress': recordsList[-1].insert(4, level['percent'])
-
-        return recordsList
+            return records_list
+        elif display_mode == 'default':
+            records_list = ''
+            for level in levels[offset:limit]:
+                if records_type == 'progress':
+                    records_list += f'{level['place']}. {level['level_name']} ({level['level_id']}) - {level['video']}'
 
 class Country:
-    def __init__(self, name):
-        global api_url
-        url = f'{api_url}/countries/top/main'
+    def __init__(self, name: str):
+        url = f'{API_URL}/countries/top/main'
         self._name = name.replace(' ', '-')
-
-        if self._name == 'Unknown': self.flag = ''
-        else: self.flag = getflag(self._name)
-
-        self._data = _connector(url)
-        for country in self._data:
-            if country["country"] == self._name:
-                self.score = country['score']
-                self.place = country['place']
-    def players(self, offset=0, display_mode=None):
-        if not isinstance(offset, int):
-            raise TypeError("'offset' value must be an integer")
-        if not isinstance(display_mode, str) and not display_mode == None:
-            raise TypeError("'display_mode' value must be a string")
-        global api_url
-        url = f"{api_url}/countries/main"
-        params = {
-            "country": self._name
-        }
-        """
-        RU: Возвращает всех игроков страны со счетом и позицией по топу страны
-        EN: Returns all country's players with score and place in country's top
-        """
         try:
-            players = ""
-            data = _connector(url, params)
-            for index, player in enumerate(data):
-                limit = offset + 50
-                if index < offset:
-                    continue
-                elif index > limit:
-                    break
-                if display_mode == None or display_mode == 'default':
-                    players += f'{index}. {player['username']} | Score: {player['score']}'
-                elif display_mode == 'list':
-                    return data
-                else:
-                    raise ValueError('"Unknown display_mode type"')
+            self._data = _connector(url)
+            self.flag = getflag(self._name) if self._name != 'Unknown' else ''
 
-            return players
-
-        except countryflag.InvalidCountryError:
-            pass
-        except HTTPError as e:
-            logger.error(e)
+            for country in self._data:
+                if country["country"] == self._name:
+                    self.score = country['score']
+                    self.place = country['place']
         except Exception as e:
-            logger.error(e)
+            logger.error(f'{type(e).__name__}: {e}')
+    
+    def players(self, offset = 0, limit = 0, display_mode: DisplayMode = 'default'):
+        """Retrieves all country's players.
+
+        :param offset: The starting offset for the players slice.
+        :type offset: int
+        :param limit: The maximum number of players to retrieve.
+        :type limit: int
+        :param display_mode: Defines the output format. Use 'list' to get a list of players, or 'default' for a formatted string.
+        :type display_mode: str
+        :return: A list of players data or a formatted string, depending on the 'display_mode' flag.
+        :rtype: list | str
+        """
+        if not isinstance(offset, int): raise TypeError('"offset" value must be an integer')
+        if not isinstance(limit, int): raise TypeError('"limit" value must be an integer')
+        if display_mode not in get_args(DisplayMode): raise ValueError('"display_mode" must be "default" or "list"')
+        if limit > 50:
+            limit = 50
+            logger.warning('Country: The "limit" parameter exceeds the maximum of 50 and has been capped at 50.')
+
+        url = f'{API_URL}/countries/main'
+        params = { "country": self._name }
+
+        try:
+            data = _connector(url, params)
+            logger.info('Country: Receiving data successfully.')
+
+            if display_mode == 'default':
+                players = ''
+                for i, player in enumerate(data):
+                    if i+1 < offset: continue
+                    players += f'{i+1}. {player['username']} - {player['score']}\n'
+                    if i+1 == limit: break
+                
+                return players
+            elif display_mode == 'list':
+                return data
+        except Exception as e:
+            logger.error(f'{type(e).__name__}: {e}')
 
 class Level:
-    def __init__(self, name):
-        self._name = name
-        global api_url
-        url = f'{api_url}/levels/classic'
-        levels = _connector(url)
-        for level in levels:
-            if level['name'] == self._name:
-                self.place = level['place']
-                self.id = level['level_id']
-                self.video = level['video']
-                self.verifier = level['verifier']
-                self.creator = level['creator']
-                self.list_percent = level['minimal_percent']
-                self.score = level['score']
+    def __init__(self, name: str, list_type: ListType = 'classic'):
+        self.name = name
+        self._list_type = list_type
 
-    def history(self, display_mode=None):
-        global api_url
-        url = f'{api_url}/levels/classic'
-        params = {
-            "place": self.place
-        }
-        data = _connector(url, params)[0]["history"]
+        url = f'{API_URL}/levels/{list_type}'
+        params = { "search": self.name }
+
         try:
-            changes = None
-            if display_mode == 'list':
+            data = _connector(url, params)
+            logger.info('Level: Receiving data successfully.')
+
+            self.video = data['video']
+            self.verifier = data['verifier']
+
+            if list_type == 'classic':
+                self.id = data['level_id']
+                self._id = data['id']
+                self.place = data['place']
+                self.song = data['song']
+                self.creator = data['creator']
+                self.holder = data['holder']
+                self.list_percent = data['minimal_percent']
+                self.score = data['score']
+                self.length = data['length']
+                self.history = data['history']
+            else:
+                self.status = _status(data['status'])
+                self.record = data['record']
+                self.category = data['category']
+
+        except Exception as e:
+            logger.error(f'{type(e).__name__}: {e}')
+    
+    def level_history(self, display_mode: DisplayMode = 'default'):
+        """Retrieves the complete history for a given level.
+
+        :param display_mode: Defines the output format. Use 'list' to get a list of changes, or 'default' for a formatted string.
+        :type display_mode: str
+        :return: A list of changes data or a formatted string, depending on the 'display_mode' flag.
+        :rtype: list | str
+        """
+        if self._list_type == 'future': raise StateError('The "history" method cannot be used with "future" type levels.')
+        if display_mode not in get_args(DisplayMode): raise ValueError('"display_mode" must be "default" or "list"')
+
+        try:
+            if display_mode == 'default':
+                changes = ''
+                for element in self.history:
+                    changes += f'Position: {element['place']}, type: {element['type']}, date: {element['date_created']}'
+                return changes
+            elif display_mode == 'list':
                 changes = []
-                for element in data:
+                for element in self.history:
                     new_change = {
-                        'pos': element['place'],
-                        'type': element['type'],
-                        'details': element['args'],
-                        'date': element['date_created']
+                        "pos": element['place'],
+                        "type": element['type'],
+                        "details": element['args'],
+                        "date": element['date_created']
                     }
                     changes.append(new_change)
-            elif display_mode == None or display_mode == 'default':
-                changes = ""
-                for element in data:
-                    changes += f'Position: {element['place']}, type: {element['type']}, date: {element['date_created']}'
-            return changes
+                return changes
         except Exception as e:
-            logger.error(e)
-    def records(self, amount=False, display_mode=None, offset=0):
-        if not display_mode == None and not isinstance(display_mode, str):
-            raise TypeError("'display_mode' must be a string")
-        if not isinstance(offset, int):
-            raise TypeError("'offset' must be an integer")
-        if amount == True and not display_mode == None:
-            raise TypeError("'display_mode' cannot have a value when amount=True")
-        global api_url
-        url = f'{api_url}/records'
-        params = {
-            "level_id": self.id,
-            "status": 1,
-            "without_verifiers": "true",
-            "offset": offset
-        }
+            logger.error(f'{type(e).__name__}: {e}')
+    
+    def records(self, offset = 0, amount = False, order_by: OrderBy = 'newest', display_mode: DisplayMode = 'default'):
+        """Retrieves the level's completions.
+
+        :param offset: The starting offset for the players slice.
+        :type offset: int
+        :param amount: If True, returns the level's completions with total count, else only level's completions.
+        :type amount: bool
+        :param order_by: Specifies the sorting criteria for completions: 'place', 'newest', or 'oldest'.
+        :type order_by: str
+        :param display_mode: Defines the output format. Use 'list' to get a list of completions, or 'default' for a formatted string.
+        :type display_mode: str
+        :return: A list of completions or a formatted string, depending on the 'display_mode' flag.
+        :rtype: list | str
+        """
+        if not isinstance(offset, int): raise TypeError('"offset" value must be an integer')
+        if not isinstance(amount, bool): raise TypeError('"amount" value must be an boolean')
+        if display_mode not in get_args(DisplayMode): raise ValueError('"display_mode" must be "default" or "list"')
+
+        url = f'{API_URL}/records'
+        params = { "level_id": self.id, f"order_by_{order_by}": "true", "status": 1, "without_verifiers": "true", "offset": offset }
 
         try:
-            data = None
-            if amount == False:
-                data = _connector(url, params)["records"]
-            else:
-                data = _connector(url, params)
-                count = data['total_count']
-                return count
-            victors = None
-            if display_mode == 'default' or display_mode == None:
-                victors = ""
-                for cmpl in data:
-                    victors += f'{cmpl['username']} {cmpl['percent']}% on {self._name}\n'
+            data = _connector(url, params)
+            records_data = data['records']
+            if amount: count = data['total_count']
+
+            if display_mode == 'default':
+                players = ''
+                for compl in records_data:
+                    players += f'{compl['username']} = {compl['percent']}% on {self.name}\n'
+                if amount: players += f'\nTotal records: {count}'
+
+                return players
             elif display_mode == 'list':
-                victors = []
-                for cmpl in data:
-                    new_cmpl = {
-                        "player": cmpl['username'],
-                        "flag": getflag(cmpl['country']),
-                        "video": cmpl['video'],
-                        "percent": cmpl['percent'],
-                        "level_id": cmpl['level_id'],
+                players = []
+                for compl in records_data:
+                    new_compl = {
+                        "player": compl['username'],
+                        "flag": getflag(compl['country']) if compl['country'] != 'Unknown' else '',
+                        "video": compl['video'],
+                        "percent": compl['percent'],
+                        "level_id": compl['level_id'],
                         "name": self._name
                     }
-                    victors.append(new_cmpl)
-            else:
-                raise ValueError('Unknown display_mode type\n Use "default", "list" or "details"')
-            return victors
-        except Exception as e:
-            logger.error(e)
+                    players.append(new_compl)
 
-def _get_futurelist(display_mode=None):
-    global api_url
-    url = f'{api_url}/levels/future'
-    data = _connector(url)
-    try:
-        top = None
-        statuses = {
-            0: 'Unknown',
-            1: 'In progress',
-            2: 'Verifying',
-            3: 'Open verification',
-            4: 'Finished'
-        }
-        if display_mode == 'list':
-            top = []
-            for lvl in data:
-                new_lvl = {
-                    'name': lvl['name'],
-                    'verifier': lvl['verifier'],
-                    'record': f'{lvl['record']}%',
-                    'status': statuses.get(lvl['status'])
-                }
-                top.append(new_lvl)
-        elif display_mode == 'default' or display_mode == None:
-            top = ""
-            for lvl in data:
-                top += f'{lvl['name']} | Status: {statuses.get(lvl['status'])}\n'
-        else:
-            raise ValueError('Unknown "display_mode" type. Try "default" or "list"')
-        return top
-    except Exception as e:
-        logger.error(e)
+                if amount: return players, count
+                else: return players
+        except Exception as e:
+            logger.error(f'{type(e).__name__}: {e}')
+    
+def _status(status: int):
+    if status == 0: return 'Unknown'
+    elif status == 1: return 'Not finished'
+    elif status == 2: return 'Verifying'
+    elif status == 3: return 'Open verification'
+    elif status == 4: return 'Finished'
