@@ -67,6 +67,7 @@ level = Level('Acheron') # ONLY level name
 Values that you can get...
 For classic list level:
 > id, place, score, song, video, creator, holder, verifier, list_percent, length, history
+
 For future list level:
 > status, record, category, video, verifier
 
