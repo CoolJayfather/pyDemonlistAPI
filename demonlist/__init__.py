@@ -13,18 +13,27 @@ ListType = Literal['classic', 'future']
 RecordsType = Literal['all', 'main', 'basic', 'extended', 'beyond', 'verified', 'progress']
 CountriesType = Literal['main', 'advanced']
 OrderBy = Literal['newest', 'oldest', 'place']
+LogLevel = Literal['info', 'error']
 
 logger = logging.getLogger('Demonlist API')
-logger.setLevel(logging.ERROR)
+logger.setLevel(logging.INFO)
 if not logger.handlers:
     handler = logging.StreamHandler(sys.stderr)
-    handler.setLevel(logging.ERROR)
+    handler.setLevel(logging.INFO)
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s\n%(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+
+def demonlist_log_level(log_level: LogLevel = 'error'):
+    if log_level == 'error':
+        logger.setLevel(logging.ERROR)
+    elif log_level == 'info':
+        logger.setLevel(logging.INFO)
+    else:
+        raise ValueError('"log_level" must be "error" or "info"')
 
 def _connector(url, params = None):
     response = requests.get(url, params)
@@ -87,7 +96,7 @@ def players_ranking(offset = 0, limit = 0, country = 'any', display_mode: Displa
 
             return top
     except Exception as e:
-        logger.error(f'{type(e).__name__}: {e}')
+        logger.error(f'Player ranking: {type(e).__name__}: {e}')
 
 def level_list(offset = 0, limit = 0, list_type: ListType = 'classic', as_names = False, display_mode: DisplayMode = 'default'):
     """Retrieves a slice of the level leaderboard.
@@ -171,10 +180,10 @@ def level_list(offset = 0, limit = 0, list_type: ListType = 'classic', as_names 
                 
                 return top
     except Exception as e:
-        logger.error(f'{type(e).__name__}: {e}')
+        logger.error(f'Level list: {type(e).__name__}: {e}')
 
 class Player:
-    def __init__(self, user: str):
+    def __init__(self, user):
         if isinstance(user, int): self._data = self._get_by_id(user)
         elif isinstance(user, str):
             url = "https://api.demonlist.org/users/top"
@@ -191,7 +200,7 @@ class Player:
                 raise ValueError(f'Player not found: {user}')
         else:
             raise TypeError('"user" must be integer or string.')
-        logger.info('Player: Receiving data successfully.')
+        logger.info(f'Player ({user}): Receiving data successfully.')
         
         data = self._data
         self.id = data['id']
@@ -214,7 +223,7 @@ class Player:
             data = _connector(url, params)
             return data
         except Exception as e:
-            logger.error(f'{type(e).__name__}: {e}')
+            logger.error(f'Get By ID: {type(e).__name__}: {e}')
     
     def records(self, offset = 0, limit = 0, records_type: RecordsType = 'all', display_mode: DisplayMode = 'default'):
         """Retrieves a slice of the levels completions.
@@ -262,6 +271,7 @@ class Player:
             for level in levels[offset:limit]:
                 if records_type == 'progress':
                     records_list += f'{level['place']}. {level['level_name']} ({level['level_id']}) - {level['video']}'
+            return records_list
 
 class Country:
     def __init__(self, name: str):
@@ -276,7 +286,7 @@ class Country:
                     self.score = country['score']
                     self.place = country['place']
         except Exception as e:
-            logger.error(f'{type(e).__name__}: {e}')
+            logger.error(f'Country: {type(e).__name__}: {e}')
     
     def players(self, offset = 0, limit = 0, display_mode: DisplayMode = 'default'):
         """Retrieves all country's players.
@@ -315,25 +325,35 @@ class Country:
             elif display_mode == 'list':
                 return data
         except Exception as e:
-            logger.error(f'{type(e).__name__}: {e}')
+            logger.error(f'Country players: {type(e).__name__}: {e}')
 
 class Level:
-    def __init__(self, name: str, list_type: ListType = 'classic'):
-        self.name = name
+    def __init__(self, name, list_type: ListType = 'classic'):
         self._list_type = list_type
+        self.name = None
+        self.level_id = None
 
-        url = f'{API_URL}/levels/{list_type}'
-        params = { "search": self.name }
+        if isinstance(name, str):
+            self.name = name
+            url = f'{API_URL}/levels/{list_type}'
+            params = { "search": name }
+        elif isinstance(name, int):
+            self.level_id = name
+            url = f'{API_URL}/levels/{list_type}'
+            params = { "level_id": name }
+        else:
+            raise ValueError('"name" must be integer or string')
 
         try:
-            data = _connector(url, params)
-            logger.info('Level: Receiving data successfully.')
+            data = _connector(url, params)[0]
+            logger.info(f'Level ({name}): Receiving data successfully.')
 
             self.video = data['video']
             self.verifier = data['verifier']
 
             if list_type == 'classic':
-                self.id = data['level_id']
+                self.level_id = data['level_id'] if not self.level_id else self.level_id
+                self.name = data['name'] if not self.name else self.name
                 self._id = data['id']
                 self.place = data['place']
                 self.song = data['song']
@@ -347,10 +367,10 @@ class Level:
                 self.status = _status(data['status'])
                 self.record = data['record']
                 self.category = data['category']
-
+        
         except Exception as e:
-            logger.error(f'{type(e).__name__}: {e}')
-    
+            logger.error(f'Level: {type(e).__name__}: {e}')
+
     def level_history(self, display_mode: DisplayMode = 'default'):
         """Retrieves the complete history for a given level.
 
@@ -380,7 +400,7 @@ class Level:
                     changes.append(new_change)
                 return changes
         except Exception as e:
-            logger.error(f'{type(e).__name__}: {e}')
+            logger.error(f'Level history: {type(e).__name__}: {e}')
     
     def records(self, offset = 0, amount = False, order_by: OrderBy = 'newest', display_mode: DisplayMode = 'default'):
         """Retrieves the level's completions.
@@ -431,7 +451,7 @@ class Level:
                 if amount: return players, count
                 else: return players
         except Exception as e:
-            logger.error(f'{type(e).__name__}: {e}')
+            logger.error(f'Level records: {type(e).__name__}: {e}')
     
 def _status(status: int):
     if status == 0: return 'Unknown'
@@ -439,3 +459,4 @@ def _status(status: int):
     elif status == 2: return 'Verifying'
     elif status == 3: return 'Open verification'
     elif status == 4: return 'Finished'
+    else: return 'Unknown'
