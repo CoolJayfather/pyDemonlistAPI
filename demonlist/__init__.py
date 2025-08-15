@@ -259,10 +259,9 @@ class Player:
                     "name": level['level_name'],
                     "id": level['level_id'],
                     "place": level['place'],
-                    "video": level['video']
+                    "video": level['video'],
+                    "percent": level['percent']
                 }
-                if records_type == 'progress':
-                    record['percent'] = level['percent']
                 records_list.append(record)
 
             return records_list
