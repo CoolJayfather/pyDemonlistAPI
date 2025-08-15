@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyDemonlistAPI"
+version = "0.9.0"
+
+authors = [
+ { name="karelskiy127", email="karjalanchel@gmail.com" },
+ { name="XBOCTATUK", email="xboctatuk213@gmail.com" },
+]
+description = "An python library that simply provides Global List API to your code."
+readme = "README.md"
+requires-python = ">=3.8"
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/CoolJayfather/pyDemonlistAPI"
+Issues = "https://github.com/CoolJayfather/pyDemonlistAPI/issues"
