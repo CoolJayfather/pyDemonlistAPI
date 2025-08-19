@@ -187,7 +187,7 @@ class Player:
         if isinstance(user, int): self._data = self._get_by_id(user)
         elif isinstance(user, str):
             url = "https://api.demonlist.org/users/top"
-            params = { "limit": 1, "offset": 0, "username_search": user }
+            params = { "limit": 1, "offset": 0, "username": user }
 
             try:
                 user_id = _connector(url, params)[0]['id']
@@ -458,4 +458,5 @@ def _status(status: int):
     elif status == 2: return 'Verifying'
     elif status == 3: return 'Open verification'
     elif status == 4: return 'Finished'
+
     else: return 'Unknown'
